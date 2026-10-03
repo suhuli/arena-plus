@@ -1,6 +1,7 @@
 /**
  * Cloudflare KV 多账号与旗舰会话池管理器
  * 支持账号+密码自动登录、Token 手动录入双模式
+ * 融合 /api/me/pulse 额度监控与 Trigger.dev 真实模型穿透
  */
 import { ArenaClient } from './client.js';
 import { SCOUT_PROBES } from '../scout/probes.js';
@@ -71,6 +72,9 @@ export class AccountPool {
       }
     }
 
+    const client = new ArenaClient({ token, cookie, baseUrl });
+    const pulseInfo = await client.getAccountPulse();
+
     const newAccount = {
       id: 'acc_' + Date.now(),
       name: accountData.name || accountData.email || '未命名账号',
@@ -80,7 +84,8 @@ export class AccountPool {
       cookie,
       baseUrl,
       authMethod,
-      status: 'active',
+      pulse: pulseInfo.pulse ?? 100,
+      status: pulseInfo.isExhausted ? 'exhausted' : 'active',
       flagshipSessionsCount: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -99,6 +104,29 @@ export class AccountPool {
     const filtered = accounts.filter(a => a.id !== id);
     await this.saveAccounts(filtered);
     return true;
+  }
+
+  /**
+   * 刷新账号额度百分比 (Pulse)
+   */
+  async refreshAccountPulse(accountId) {
+    const accounts = await this.getAccounts();
+    const account = accounts.find(a => a.id === accountId);
+    if (!account) return null;
+
+    const client = new ArenaClient(account);
+    const pulseInfo = await client.getAccountPulse();
+    
+    account.pulse = pulseInfo.pulse ?? account.pulse;
+    if (pulseInfo.isExhausted) {
+      account.status = 'exhausted';
+    } else {
+      account.status = 'active';
+    }
+    account.updatedAt = new Date().toISOString();
+
+    await this.saveAccounts(accounts);
+    return account;
   }
 
   /**
@@ -135,7 +163,7 @@ export class AccountPool {
    */
   async getOrRollFlagshipSession(accountId, maxTries = 5, onLog = console.log) {
     const accounts = await this.getAccounts();
-    const account = accounts.find(a => a.id === accountId) || accounts[0];
+    const account = accounts.find(a => a.id === accountId) || accounts.find(a => a.status === 'active') || accounts[0];
     if (!account) throw new Error("无可用 Arena 账号，请先在控制台添加账号！");
 
     const existingSessions = await this.getFlagshipSessions(account.id);
@@ -154,10 +182,17 @@ export class AccountPool {
       const chatId = await client.createChat(`[Scout] 自动抽取会话 #${attempt}`);
       
       const probeAnswers = {};
+      let verifiedRealModel = null;
+
       for (const probe of SCOUT_PROBES) {
         try {
-          const ans = await client.sendMessage(chatId, probe.prompt);
-          probeAnswers[probe.id] = ans;
+          const resp = await client.sendMessage(chatId, probe.prompt);
+          if (typeof resp === 'string') {
+            probeAnswers[probe.id] = resp;
+          } else {
+            probeAnswers[probe.id] = resp.answer || '';
+            if (resp.realModel) verifiedRealModel = resp.realModel;
+          }
         } catch (e) {
           onLog(`[Scout] 探针 ${probe.name} 请求失败: ${e.message}`);
           probeAnswers[probe.id] = '';
@@ -165,6 +200,13 @@ export class AccountPool {
       }
 
       const evaluation = evaluateDiagnostic(probeAnswers);
+      
+      // 如果从 Trigger.dev run trace 成功穿透拿到 100% 官方模型名
+      if (verifiedRealModel) {
+        evaluation.predictedModel = `[Trigger.dev 验证] ${verifiedRealModel}`;
+        evaluation.confidence = '100% (Trace 穿透)';
+      }
+
       onLog(`[Scout 结果] 会话 ${chatId} 评分: ${evaluation.scorePercentage}分 (${evaluation.tier}级) - ${evaluation.predictedModel}`);
 
       const sessionRecord = {
@@ -182,6 +224,9 @@ export class AccountPool {
       await this.saveSessions(account.id, existingSessions);
 
       if (evaluation.tier === 'S') {
+        account.flagshipSessionsCount = (account.flagshipSessionsCount || 0) + 1;
+        account.currentModel = evaluation.predictedModel;
+        await this.saveAccounts(accounts);
         onLog(`🎉 成功捕获 S 级旗舰会话: ${chatId} (${evaluation.predictedModel})`);
         return { session: sessionRecord, rolled: true, attempt, evaluation };
       }

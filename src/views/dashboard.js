@@ -160,8 +160,14 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
                 <div>
                   <div class="flex items-center gap-2">
                     <h3 class="font-bold text-sm text-white">{{ acc.name }}</h3>
-                    <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold">
+                    <span v-if="acc.status === 'active'" class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold">
                       🟢 活跃
+                    </span>
+                    <span v-else class="px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] font-semibold">
+                      🔴 额度耗尽
+                    </span>
+                    <span class="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px] font-bold">
+                      ⚡ 额度: {{ acc.pulse !== undefined ? acc.pulse + '%' : '100%' }}
                     </span>
                     <span v-if="acc.authMethod === 'password_auto'" class="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-semibold">
                       🔑 密码自动登录

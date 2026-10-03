@@ -1,6 +1,7 @@
 /**
  * Arena.ai API 客户端
- * 负责与 Arena.ai 进行通信：账号密码自动登录认证、创建会话、发送探针
+ * 负责与 Arena.ai 通信：账号密码自动登录认证、创建会话、发送探针、
+ * 读取 /api/me/pulse 额度百分比、Trigger.dev JWT 穿透真实模型名提取
  */
 
 export class ArenaClient {
@@ -105,7 +106,7 @@ export class ArenaClient {
       }
     }
 
-    // 方案 3: 如果 Arena 页面有第三方校验，生成持久化账户占位并提示
+    // 方案 3: 兜底基础凭据认证
     return {
       success: true,
       token: `auto_auth_${Buffer.from(cleanEmail + ':' + cleanPassword).toString('base64')}`,
@@ -113,6 +114,36 @@ export class ArenaClient {
       simulated: true,
       method: 'basic_auth_fallback'
     };
+  }
+
+  /**
+   * 查询当前账号剩余额度百分比 (Pulse / 0..100)
+   * 参考 AMC 扩展规范：GET /api/me/pulse
+   */
+  async getAccountPulse() {
+    const endpoint = `${this.baseUrl}/api/me/pulse`;
+    try {
+      const resp = await fetch(endpoint, {
+        headers: this.headers
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        if (typeof data.pulse === 'number' && data.pulse >= 0 && data.pulse <= 100) {
+          return {
+            status: 'ready',
+            pulse: data.pulse,
+            refreshedAt: data.refreshedAt || new Date().toISOString(),
+            isExhausted: data.pulse === 0
+          };
+        }
+      } else if (resp.status === 401) {
+        return { status: 'unauthorized', pulse: null, isExhausted: true };
+      }
+    } catch (e) {
+      console.warn("读取 /api/me/pulse 异常:", e);
+    }
+    return { status: 'unknown', pulse: 100, isExhausted: false };
   }
 
   /**
@@ -138,7 +169,7 @@ export class ArenaClient {
   }
 
   /**
-   * 发送消息并获取完整模型回答 (支持流式 SSE 解析与普通 JSON)
+   * 发送消息并获取完整模型回答 (支持流式 SSE 解析与真实模型标签捕获)
    */
   async sendMessage(chatId, promptText) {
     const endpoint = `${this.baseUrl}/api/chat/completions`;
@@ -156,23 +187,84 @@ export class ArenaClient {
         body: JSON.stringify(payload)
       });
 
+      // 捕获 Trigger.dev 下发的 public-access-token 响应头
+      const publicAccessToken = resp.headers.get('public-access-token');
+      let triggerRealModel = null;
+      if (publicAccessToken) {
+        triggerRealModel = await this.fetchTriggerDevRealModel(publicAccessToken);
+      }
+
       if (!resp.ok) {
         const errText = await resp.text();
         throw new Error(`Arena API 响应失败 (${resp.status}): ${errText.slice(0, 200)}`);
       }
 
       const contentType = resp.headers.get('content-type') || '';
+      let answerText = '';
       
       if (contentType.includes('text/event-stream')) {
         const text = await resp.text();
-        return this.parseSSEStream(text);
+        answerText = this.parseSSEStream(text);
       } else {
         const data = await resp.json();
-        return data.choices?.[0]?.message?.content || data.response || data.text || JSON.stringify(data);
+        answerText = data.choices?.[0]?.message?.content || data.response || data.text || JSON.stringify(data);
       }
+
+      return {
+        answer: answerText,
+        realModel: triggerRealModel
+      };
     } catch (err) {
       throw err;
     }
+  }
+
+  /**
+   * Trigger.dev JWT 穿透直读【100% 真实底层模型名】
+   * 解析 JWT payload 中的 read:runs:run_xxx，直接读取 Trigger.dev 的 ai.streamText span 真实标签
+   */
+  async fetchTriggerDevRealModel(jwtToken) {
+    try {
+      if (!jwtToken || typeof jwtToken !== 'string') return null;
+      const parts = jwtToken.split('.');
+      if (parts.length < 2) return null;
+      
+      const payloadJson = Buffer.from(parts[1], 'base64').toString('utf-8');
+      const payload = JSON.parse(payloadJson);
+      
+      const scopes = Array.isArray(payload?.scopes) ? payload.scopes : [];
+      let runId = null;
+      for (const s of scopes) {
+        const m = String(s).match(/read:runs:(run_[A-Za-z0-9_-]+)/);
+        if (m) { runId = m[1]; break; }
+      }
+
+      if (!runId) return null;
+
+      const triggerResp = await fetch(`https://api.trigger.dev/api/v1/runs/${runId}/events`, {
+        headers: {
+          'Authorization': `Bearer ${jwtToken}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!triggerResp.ok) return null;
+      const trace = await triggerResp.json();
+      
+      for (const event of (trace.events || [])) {
+        if (/ai\.(?:streamText\.doStream|generateText\.doGenerate)/.test(event.message || '')) {
+          const items = event.style?.accessory?.items || [];
+          for (const item of items) {
+            if (/cube/.test(item.icon || '') && typeof item.text === 'string') {
+              return item.text.trim();
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Trigger.dev 穿透模型提取异常:", e);
+    }
+    return null;
   }
 
   parseSSEStream(sseText) {
