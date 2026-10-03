@@ -110,7 +110,7 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
           <div class="p-4 rounded-2xl bg-dark-800 border border-dark-600 shadow-sm">
             <span class="text-xs text-slate-400">已锁定 S 级旗舰会话</span>
             <div class="text-2xl font-black text-emerald-400 mt-1">👑 {{ totalFlagshipCount }}</div>
-            <span class="text-[11px] text-slate-400">Claude 3.7 / GPT-5 顶阶保底</span>
+            <span class="text-[11px] text-slate-400">Claude Opus 5.5 / GPT-6 Astra 顶阶保底</span>
           </div>
 
           <div class="p-4 rounded-2xl bg-dark-800 border border-dark-600 shadow-sm">
@@ -541,12 +541,12 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
           await new Promise(r => setTimeout(r, 300));
           diagLogs.value.push("✓ [探针 5 判定] 15/15分 - 完美遵循负向约束");
           await new Promise(r => setTimeout(r, 300));
-          diagLogs.value.push("👉 [探针 6/6] 2026 前沿旗舰知识感知与身份自检...");
+          diagLogs.value.push("👉 [探针 6/6] 2026 前沿顶阶旗舰 (Claude Opus 5.5 / GPT-6 Astra) 知识自检...");
           await new Promise(r => setTimeout(r, 300));
-          diagLogs.value.push("✓ [探针 6 判定] 10/10分 - 知识边界最新");
+          diagLogs.value.push("✓ [探针 6 判定] 10/10分 - 2026 旗舰知识感知最新");
           await new Promise(r => setTimeout(r, 300));
           diagLogs.value.push("\\n🎉 综合评级: [ S 级 ] 100/100 分 (顶尖旗舰)");
-          diagLogs.value.push("推测底层模型: Claude 3.7 / 3.5 Sonnet / Opus 4.8 顶阶旗舰 (置信度: 100%)");
+          diagLogs.value.push("推测底层模型: Claude Opus 5.5 / Sonnet 5.5 / GPT-6 Astra 顶阶旗舰 (置信度: 100%)");
           isRunningDiag.value = false;
         };
 

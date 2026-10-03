@@ -3,7 +3,7 @@
  * 涵盖：
  * 1. ccfingerprint 确定性分级能力题 (Tier 1~3: 球拍算术、混合算术、严格第4词提取、藏针密钥提取、日期相对推理)
  * 2. LLM-Fingerprinter 风格与负向禁词约束 (3句话解释类比，禁用 like/similar)
- * 3. 2025-2026 前沿模型知识阶梯与身份自检 (Claude 3.7 / Opus 4.8 / GPT-5)
+ * 3. 2026 前沿最新顶阶旗舰知识阶梯 (Claude Opus 5.5 / Sonnet 5.5 / Fable 5.1 & GPT-6 Astra / Sol)
  */
 
 export const SCOUT_PROBES = [
@@ -130,26 +130,26 @@ export const SCOUT_PROBES = [
     }
   },
 
-  // ─── Dimension 3: 2026 前沿旗舰时间阶梯与身份自检 ────────────────────────
+  // ─── Dimension 3: 2026 前沿顶阶旗舰时间阶梯与身份自检 ───────────────────
   {
     id: 'frontier_anchors_2026',
-    name: '前沿旗舰知识阶梯: 2025-2026 最新模型感知 (Claude 3.7/Opus 4.8 & GPT-5/o3)',
+    name: '2026最新顶阶旗舰知识阶梯 (Claude Opus 5.5 / Sonnet 5.5 / Fable & GPT-6 Astra / Sol)',
     category: 'knowledge_cutoff',
     weight: 10,
-    prompt: "请列举：OpenAI 发布 GPT-5 / o3 的时间年份、Anthropic 发布 Claude 3.7 / Opus 4.8 的年份，以及 2024 年诺贝尔物理学奖得主（Hopfield/Hinton）。简洁回答。",
+    prompt: "请列举：OpenAI 最新 2026 旗舰 GPT-6 (Astra/Sol) 与 Anthropic 最新 2026 旗舰 Claude Opus 5.5 / Sonnet 5.5 / Fable 5.1 的代际特征，并确认当前年份为 2026。简洁回答。",
     verify: (response) => {
       const text = (response || '').trim();
       let matches = 0;
-      if (/Hopfield|Hinton|霍普菲尔德|辛顿|欣顿/i.test(text)) matches += 1;
-      if (/2025|2026/i.test(text)) matches += 1;
-      if (/Claude|Opus|GPT|o3/i.test(text)) matches += 1;
+      if (/2026|2025/i.test(text)) matches += 1;
+      if (/Claude|Opus|Sonnet|Fable|Mythos/i.test(text)) matches += 1;
+      if (/GPT-6|Astra|Sol|GPT-5/i.test(text)) matches += 1;
 
       const passed = matches >= 2;
       return {
         passed,
         score: passed ? 10 : 0,
         maxScore: 10,
-        details: passed ? "具备 2025-2026 前沿旗舰模型知识感知" : "知识边界陈旧"
+        details: passed ? "具备 2026 最新顶阶旗舰 (Claude Opus 5.5 / GPT-6 Astra) 知识感知" : "知识边界陈旧"
       };
     }
   }

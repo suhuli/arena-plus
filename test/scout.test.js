@@ -48,7 +48,7 @@ describe('ccfingerprint & LLM-Fingerprinter Hybrid Probes', () => {
       needle_extraction: "ZX9-QY7-KP3",
       date_reasoning: "星期一",
       forbidden_constraint: "类比是一种将熟悉领域的逻辑结构映射到陌生领域的认知机制。它通过传递底层关系而非表层特征来帮助深入理解新事物。这种思维桥梁使得抽象复杂概念的解释变得直观明了。",
-      frontier_anchors_2026: "GPT-5 于 2025 年发布，Claude 3.7 及 Opus 4.8 具备最新架构，诺奖得主为 Hopfield 和 Hinton。"
+      frontier_anchors_2026: "2026 年最新旗舰为 OpenAI GPT-6 (Astra/Sol) 与 Anthropic Claude Opus 5.5 / Sonnet 5.5 / Fable 5.1。"
     };
 
     const evaluation = evaluateDiagnostic(answers);
