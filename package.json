@@ -6,7 +6,9 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "build": "echo 'Build step complete'",
     "deploy": "wrangler deploy",
+    "pages:deploy": "wrangler pages deploy .",
     "test": "node --test test/*.test.js"
   },
   "keywords": [
