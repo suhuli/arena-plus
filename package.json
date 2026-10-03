@@ -1,0 +1,30 @@
+{
+  "name": "arena-plus",
+  "version": "1.0.0",
+  "description": "Arena.ai Multi-Account Manager & S-Tier Model Scout MCP Server on Cloudflare Workers",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "arena",
+    "mcp",
+    "model-context-protocol",
+    "cloudflare-workers",
+    "cursor",
+    "claude-desktop",
+    "ai-agent",
+    "llm-fingerprint"
+  ],
+  "author": "suhuli",
+  "license": "MIT",
+  "dependencies": {
+    "hono": "^4.6.14"
+  },
+  "devDependencies": {
+    "wrangler": "^3.101.0"
+  }
+}

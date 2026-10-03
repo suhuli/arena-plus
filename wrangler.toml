@@ -1,0 +1,22 @@
+name = "arena-plus"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 绑定 Cloudflare KV 用于持久化多账号 Token、S 级会话池和诊断评分
+# 部署前执行: npx wrangler kv:namespace create ARENA_KV
+# 然后将生成的 id 填入下方
+[[kv_namespaces]]
+binding = "ARENA_KV"
+id = "YOUR_KV_NAMESPACE_ID"
+preview_id = "YOUR_PREVIEW_KV_NAMESPACE_ID"
+
+[vars]
+# MCP 安全访问密钥 (在 Cursor/Claude Desktop 中作为 query ?key=xxx 传递)
+MCP_AUTH_KEY = "arena-plus-secret-key"
+
+# 默认期望捕获的目标等级: 'S' (>=90分) 或 'A' (>=75分)
+DEFAULT_TARGET_TIER = "S"
+
+# 自动重新抽取会话的最大轮数
+AUTO_REROLL_MAX = 5
