@@ -10,8 +10,9 @@
 ## 🌟 核心特性
 
 - 🌐 **运行在 Cloudflare Workers 边缘端**：24/7 全天候运行，无需本地常驻软件，利用 Cloudflare 免费额度实现零成本托管。
+- 🔑 **支持【邮箱+密码直接登录】与【Token 录入】双模式**：支持直接输入 Arena 账号与密码，Worker 边缘端自动完成登录并提取鉴权 Session；勾选自动续期后，Token 过期时后台自动无感重登，告别手动抓包。
 - 👑 **S 级旗舰模型自动抽取与保底（Flagship Gating）**：
-  - 自动通过 4 道高特异性探针（双重禁词约束、字符级空间注意力、三段论多步逻辑推理、前沿时间感知）在边缘端为会话进行确定性打分；
+  - 融合 **`ccfingerprint` 确定性分级能力题库**（球拍思维陷阱、混合算术、严格第4词提取、干扰文本藏针、日期推导）与 **`LLM-Fingerprinter` 风格负向约束**；
   - **如果会话出现降智或轻量模型，后台自动重新抽取（Re-roll），直到捕获 90~100 分的 S 级顶级旗舰模型（如 Claude 3.7 / GPT 顶阶）才返回给 IDE！**
 - 🔌 **标准 Remote MCP 协议（Server-Sent Events）**：
   - 一键挂载到 **Cursor (`~/.cursor/mcp.json`)**、**Claude Desktop (`claude_desktop_config.json`)** 和 **Cline / Windsurf**；
