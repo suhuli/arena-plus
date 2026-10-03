@@ -3,13 +3,12 @@ main = "src/index.js"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
-# 绑定 Cloudflare KV 用于持久化多账号 Token、S 级会话池和诊断评分
-# 部署前执行: npx wrangler kv:namespace create ARENA_KV
-# 然后将生成的 id 填入下方
-[[kv_namespaces]]
-binding = "ARENA_KV"
-id = "YOUR_KV_NAMESPACE_ID"
-preview_id = "YOUR_PREVIEW_KV_NAMESPACE_ID"
+# 说明：KV 绑定可以直接在 Cloudflare 网页后台 (Settings -> Bindings / Variables) 中添加，
+# 变量名称填 ARENA_KV，无需在代码中硬编码 placeholder ID。
+# 如果通过本地 wrangler CLI 部署，可取消下方注释并填入真实的 namespace id：
+# [[kv_namespaces]]
+# binding = "ARENA_KV"
+# id = "your-real-kv-id"
 
 [vars]
 # MCP 安全访问密钥 (在 Cursor/Claude Desktop 中作为 query ?key=xxx 传递)
