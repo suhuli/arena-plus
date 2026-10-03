@@ -66,3 +66,32 @@ describe('MCP Protocol Server Handler', () => {
     assert.ok(res.result.tools.some(t => t.name === 'arena_ask'));
   });
 });
+
+describe('Account Pool & Auto-Auth', () => {
+  it('should add account with credentials and default fallback', async () => {
+    const { AccountPool } = await import('../src/arena/account-pool.js');
+    const pool = new AccountPool({});
+    const acc = await pool.addAccount({
+      name: 'Test-VIP',
+      email: 'test@example.com',
+      password: 'password123',
+      savePassword: true
+    });
+    assert.strictEqual(acc.name, 'Test-VIP');
+    assert.strictEqual(acc.email, 'test@example.com');
+    assert.strictEqual(acc.authMethod, 'password_auto');
+  });
+
+  it('should add account with direct token', async () => {
+    const { AccountPool } = await import('../src/arena/account-pool.js');
+    const pool = new AccountPool({});
+    const acc = await pool.addAccount({
+      name: 'Test-Token-Acc',
+      token: 'session_mock_123456'
+    });
+    assert.strictEqual(acc.name, 'Test-Token-Acc');
+    assert.strictEqual(acc.token, 'session_mock_123456');
+    assert.strictEqual(acc.authMethod, 'manual_token');
+  });
+});
+

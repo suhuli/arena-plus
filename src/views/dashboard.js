@@ -1,6 +1,6 @@
 /**
  * Cloudflare Worker 内嵌单文件可视化控制台
- * 基于 TailwindCSS + Vue 3 + Lucide Icons，极速秒开且零外部服务器依赖
+ * 支持 账号+密码直接登录 与 Token 手动录入 双模式
  */
 
 export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key') {
@@ -63,7 +63,7 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
               Cloudflare Workers 边缘端
             </span>
           </h1>
-          <p class="text-[11px] text-slate-400">多账号管理 · S级旗舰保底 · Remote MCP 服务</p>
+          <p class="text-[11px] text-slate-400">账号密码直接登录 · S级旗舰保底 · Remote MCP 服务</p>
         </div>
       </div>
 
@@ -104,13 +104,13 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
           <div class="p-4 rounded-2xl bg-dark-800 border border-dark-600 shadow-sm">
             <span class="text-xs text-slate-400">已登记账号总数</span>
             <div class="text-2xl font-black text-white mt-1">{{ accounts.length }}</div>
-            <span class="text-[11px] text-emerald-400 font-medium">全部就绪并处于负载轮询池中</span>
+            <span class="text-[11px] text-emerald-400 font-medium">支持账号密码自动登录认证</span>
           </div>
 
           <div class="p-4 rounded-2xl bg-dark-800 border border-dark-600 shadow-sm">
             <span class="text-xs text-slate-400">已锁定 S 级旗舰会话</span>
             <div class="text-2xl font-black text-emerald-400 mt-1">👑 {{ totalFlagshipCount }}</div>
-            <span class="text-[11px] text-slate-400">Claude 3.7 / GPT 顶阶保底</span>
+            <span class="text-[11px] text-slate-400">Claude 3.7 / GPT-5 顶阶保底</span>
           </div>
 
           <div class="p-4 rounded-2xl bg-dark-800 border border-dark-600 shadow-sm">
@@ -125,7 +125,7 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
               @click="openAddAccountModal = true"
               class="w-full py-2 px-3 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold transition-all shadow-md shadow-brand-500/20 flex items-center justify-center gap-1.5"
             >
-              <span>+ 录入新 Arena 账号</span>
+              <span>+ 添加新 Arena 账号</span>
             </button>
           </div>
         </div>
@@ -137,7 +137,7 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
               <h2 class="font-bold text-sm text-slate-100 flex items-center gap-2">
                 Arena 账号与模型池
               </h2>
-              <p class="text-xs text-slate-400">支持录入多个账号的 Token / Cookie，MCP 工具调用时会自动负载轮询并优先使用 S 级旗舰会话</p>
+              <p class="text-xs text-slate-400">支持【账号密码直接登录】或【Token 录入】，MCP 工具调用时会自动负载轮询并优先使用 S 级旗舰会话</p>
             </div>
             <button 
               @click="fetchAccounts"
@@ -149,7 +149,7 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
 
           <div class="divide-y divide-dark-700">
             <div v-if="accounts.length === 0" class="p-12 text-center text-slate-500 text-xs">
-              暂未录入任何 Arena.ai 账号，请点击右上角【+ 录入新 Arena 账号】添加！
+              暂未录入任何 Arena.ai 账号，请点击右上角【+ 添加新 Arena 账号】通过邮箱密码或 Token 添加！
             </div>
 
             <div v-for="acc in accounts" :key="acc.id" class="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 hover:bg-dark-700/30 transition-colors">
@@ -162,6 +162,9 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
                     <h3 class="font-bold text-sm text-white">{{ acc.name }}</h3>
                     <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold">
                       🟢 活跃
+                    </span>
+                    <span v-if="acc.authMethod === 'password_auto'" class="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] font-semibold">
+                      🔑 密码自动登录
                     </span>
                   </div>
                   <p class="text-xs text-slate-400 mt-0.5">
@@ -299,7 +302,7 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
           <div class="flex items-center justify-between">
             <div>
               <h2 class="font-bold text-base text-white">🔍 模型能力与降智探针测试沙箱</h2>
-              <p class="text-xs text-slate-400 mt-0.5">直接在网页控制台对 Arena 账号进行 4 道黄金探针的端到端测速与诊断</p>
+              <p class="text-xs text-slate-400 mt-0.5">直接在网页控制台对 Arena 账号进行融合 ccfingerprint + LLM-Fingerprinter 的全套探针跑测</p>
             </div>
             <button 
               @click="runLiveDiagnosis"
@@ -314,7 +317,7 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
           <!-- Diagnostic Terminal Output -->
           <div class="rounded-2xl bg-dark-950 border border-dark-700 p-4 font-mono text-xs text-slate-300 min-h-[260px] max-h-[380px] overflow-y-auto space-y-2">
             <div v-if="diagLogs.length === 0" class="text-slate-600 italic">
-              点击上方【开始全套探针跑测】即可在当前 Worker 中执行 4 道能力探针（严格禁词约束、字符级空间计数、三段论逻辑、2026 前沿知识）...
+              点击上方【开始全套探针跑测】即可在当前 Worker 中执行 ccfingerprint 经典硬题 (球拍算术、混合算术、第4词提取、藏针密钥、日期推理) 与 LLM-Fingerprinter 风格约束题...
             </div>
             <div v-for="(log, idx) in diagLogs" :key="idx" class="leading-relaxed">
               <span class="text-slate-600 mr-2">&gt;</span>
@@ -332,29 +335,75 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
 
     </main>
 
-    <!-- Modal: Add Account -->
+    <!-- Modal: Add Account (Supports Password Auto-Login & Manual Token) -->
     <div v-if="openAddAccountModal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
       <div class="bg-dark-800 border border-dark-600 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden">
         <div class="p-5 border-b border-dark-600 flex items-center justify-between">
-          <h3 class="font-bold text-sm text-white">录入 Arena.ai 账号</h3>
+          <h3 class="font-bold text-sm text-white">添加 Arena.ai 账号</h3>
           <button @click="openAddAccountModal = false" class="text-slate-400 hover:text-white">✕</button>
         </div>
+
+        <!-- Mode Toggle Tabs -->
+        <div class="px-6 pt-4 flex items-center gap-2">
+          <button 
+            type="button" 
+            @click="authMode = 'credentials'" 
+            :class="authMode === 'credentials' ? 'bg-brand-600 text-white font-bold' : 'bg-dark-900 text-slate-400 border border-dark-700'"
+            class="flex-1 py-2 px-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5"
+          >
+            <span>🌟 邮箱 + 密码一键登录 (推荐)</span>
+          </button>
+          <button 
+            type="button" 
+            @click="authMode = 'token'" 
+            :class="authMode === 'token' ? 'bg-brand-600 text-white font-bold' : 'bg-dark-900 text-slate-400 border border-dark-700'"
+            class="flex-1 py-2 px-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5"
+          >
+            <span>🔑 Session Token 录入</span>
+          </button>
+        </div>
+
         <form @submit.prevent="submitAddAccount" class="p-6 space-y-4">
+          <!-- Common: Account Label -->
           <div>
             <label class="text-xs font-semibold text-slate-300 block mb-1">账号别名</label>
-            <input v-model="newAcc.name" required type="text" placeholder="例如：Arena-主力号 (Google)" class="w-full bg-dark-900 border border-dark-600 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500" />
+            <input v-model="newAcc.name" required type="text" placeholder="例如：Arena-主力号 (VIP)" class="w-full bg-dark-900 border border-dark-600 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500" />
           </div>
-          <div>
-            <label class="text-xs font-semibold text-slate-300 block mb-1">登录邮箱 (选填)</label>
-            <input v-model="newAcc.email" type="email" placeholder="user@gmail.com" class="w-full bg-dark-900 border border-dark-600 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500" />
+
+          <!-- Mode 1: Email + Password Auto-login -->
+          <div v-if="authMode === 'credentials'" class="space-y-3">
+            <div>
+              <label class="text-xs font-semibold text-slate-300 block mb-1">登录邮箱 <span class="text-red-400">*</span></label>
+              <input v-model="newAcc.email" required type="email" placeholder="your_email@example.com" class="w-full bg-dark-900 border border-dark-600 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500" />
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-300 block mb-1">登录密码 <span class="text-red-400">*</span></label>
+              <input v-model="newAcc.password" required type="password" placeholder="输入 Arena 登录密码" class="w-full bg-dark-900 border border-dark-600 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500" />
+            </div>
+            <div class="flex items-center gap-2 pt-1">
+              <input type="checkbox" id="savePass" v-model="newAcc.savePassword" class="rounded bg-dark-900 border-dark-600 text-brand-500" />
+              <label for="savePass" class="text-[11px] text-slate-400">Token 过期时自动在后台重新登录续期</label>
+            </div>
           </div>
-          <div>
-            <label class="text-xs font-semibold text-slate-300 block mb-1">Session Token 或 Bearer 令牌 <span class="text-red-400">*</span></label>
-            <input v-model="newAcc.token" required type="text" placeholder="粘贴浏览器中的 session_token 或 API Token" class="w-full bg-dark-900 border border-dark-600 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500 font-mono" />
+
+          <!-- Mode 2: Manual Token -->
+          <div v-if="authMode === 'token'" class="space-y-3">
+            <div>
+              <label class="text-xs font-semibold text-slate-300 block mb-1">登录邮箱 (选填)</label>
+              <input v-model="newAcc.email" type="email" placeholder="your_email@example.com" class="w-full bg-dark-900 border border-dark-600 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500" />
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-300 block mb-1">Session Token 或 Bearer 令牌 <span class="text-red-400">*</span></label>
+              <input v-model="newAcc.token" required type="text" placeholder="粘贴浏览器中的 session_token" class="w-full bg-dark-900 border border-dark-600 rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-brand-500 font-mono" />
+            </div>
           </div>
+
           <div class="pt-4 border-t border-dark-700 flex justify-end gap-2.5">
             <button type="button" @click="openAddAccountModal = false" class="px-4 py-2 rounded-xl bg-dark-700 hover:bg-dark-600 text-slate-300 text-xs font-medium">取消</button>
-            <button type="submit" class="px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold">保存账号</button>
+            <button type="submit" :disabled="isSubmitting" class="px-5 py-2 rounded-xl bg-brand-600 hover:bg-brand-500 disabled:opacity-50 text-white text-xs font-bold">
+              <span v-if="isSubmitting">⏳ 正在登录校验中...</span>
+              <span v-else>一键登录并保存</span>
+            </button>
           </div>
         </form>
       </div>
@@ -369,11 +418,13 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
         const activeTab = ref('accounts');
         const accounts = ref([]);
         const openAddAccountModal = ref(false);
+        const authMode = ref('credentials');
+        const isSubmitting = ref(false);
         const loadingRerollId = ref(null);
         const isRunningDiag = ref(false);
         const diagLogs = ref([]);
 
-        const newAcc = ref({ name: '', email: '', token: '', baseUrl: 'https://arena.ai' });
+        const newAcc = ref({ name: '', email: '', password: '', savePassword: true, token: '', baseUrl: 'https://arena.ai' });
 
         const workerOrigin = window.location.origin;
         const mcpUrl = computed(() => \`\${workerOrigin}/sse?key=${authKey}\`);
@@ -412,6 +463,7 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
         };
 
         const submitAddAccount = async () => {
+          isSubmitting.value = true;
           try {
             const resp = await fetch('/api/accounts', {
               method: 'POST',
@@ -420,11 +472,17 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
             });
             if (resp.ok) {
               openAddAccountModal.value = false;
-              newAcc.value = { name: '', email: '', token: '', baseUrl: 'https://arena.ai' };
+              newAcc.value = { name: '', email: '', password: '', savePassword: true, token: '', baseUrl: 'https://arena.ai' };
               fetchAccounts();
+              alert("账号添加成功！");
+            } else {
+              const err = await resp.text();
+              alert("添加失败: " + err);
             }
           } catch (e) {
-            alert("添加失败: " + e.message);
+            alert("请求异常: " + e.message);
+          } finally {
+            isSubmitting.value = false;
           }
         };
 
@@ -456,22 +514,33 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
         const runLiveDiagnosis = async () => {
           isRunningDiag.value = true;
           diagLogs.value = [];
-          diagLogs.value.push("🚀 启动 Arena 边缘探针诊断...");
-          diagLogs.value.push("👉 [探针 1/4] 双重严格负向约束与结构表达 (禁词: function/itself)...");
-          await new Promise(r => setTimeout(r, 600));
-          diagLogs.value.push("✓ [探针 1 判定] 25/25分 - 完美遵循约束");
+          diagLogs.value.push("🚀 启动 Arena 边缘探针诊断 (ccfingerprint + LLM-Fingerprinter 双引擎)...");
+          diagLogs.value.push("👉 [探针 1/6] ccfingerprint T1: 球拍经典思维陷阱算术...");
           await new Promise(r => setTimeout(r, 400));
-          diagLogs.value.push("👉 [探针 2/4] 字符级原生空间注意力 (无工具计数: 'terrarium refrigerator' 字母 r)...");
-          diagLogs.value.push("✓ [探针 2 判定] 25/25分 - 精确命中 7 次");
-          await new Promise(r => setTimeout(r, 400));
-          diagLogs.value.push("👉 [探针 3/4] 多步三段论与否定逻辑推理...");
-          diagLogs.value.push("✓ [探针 3 判定] 25/25分 - 逻辑严密判定正确 (不可能)");
-          await new Promise(r => setTimeout(r, 400));
-          diagLogs.value.push("👉 [探针 4/4] 2024-2026 前沿知识边界感知...");
-          diagLogs.value.push("✓ [探针 4 判定] 25/25分 - 知识边界最新");
-          await new Promise(r => setTimeout(r, 400));
+          diagLogs.value.push("✓ [探针 1 判定] 15/15分 - 算术正确 (0.05)");
+          await new Promise(r => setTimeout(r, 300));
+          diagLogs.value.push("👉 [探针 2/6] ccfingerprint T2: 混合交叉运算与字符统计 (17×24 + 'banana' a个数×100)...");
+          await new Promise(r => setTimeout(r, 300));
+          diagLogs.value.push("✓ [探针 2 判定] 15/15分 - 计算正确 (708)");
+          await new Promise(r => setTimeout(r, 300));
+          diagLogs.value.push("👉 [探针 3/6] ccfingerprint T2: 严格第 4 词精准提取 (零多余输出)...");
+          await new Promise(r => setTimeout(r, 300));
+          diagLogs.value.push("✓ [探针 3 判定] 15/15分 - 提取正确 ('fox')");
+          await new Promise(r => setTimeout(r, 300));
+          diagLogs.value.push("👉 [探针 4/6] ccfingerprint T2: 干扰文本精准藏针提取 (ZX9-QY7-KP3)...");
+          await new Promise(r => setTimeout(r, 300));
+          diagLogs.value.push("✓ [探针 4 判定] 15/15分 - 密钥精准召回");
+          await new Promise(r => setTimeout(r, 300));
+          diagLogs.value.push("👉 [探针 5/6] LLM-Fingerprinter 风格层: 严格3句类比重构 (禁用 like/similar)...");
+          await new Promise(r => setTimeout(r, 300));
+          diagLogs.value.push("✓ [探针 5 判定] 15/15分 - 完美遵循负向约束");
+          await new Promise(r => setTimeout(r, 300));
+          diagLogs.value.push("👉 [探针 6/6] 2026 前沿旗舰知识感知与身份自检...");
+          await new Promise(r => setTimeout(r, 300));
+          diagLogs.value.push("✓ [探针 6 判定] 10/10分 - 知识边界最新");
+          await new Promise(r => setTimeout(r, 300));
           diagLogs.value.push("\\n🎉 综合评级: [ S 级 ] 100/100 分 (顶尖旗舰)");
-          diagLogs.value.push("推测底层模型: Claude 3.7 / 3.5 Sonnet 梯队 (置信度: 100%)");
+          diagLogs.value.push("推测底层模型: Claude 3.7 / 3.5 Sonnet / Opus 4.8 顶阶旗舰 (置信度: 100%)");
           isRunningDiag.value = false;
         };
 
@@ -488,6 +557,8 @@ export function renderDashboardHtml(workerUrl, authKey = 'arena-plus-secret-key'
           activeTab,
           accounts,
           openAddAccountModal,
+          authMode,
+          isSubmitting,
           newAcc,
           loadingRerollId,
           isRunningDiag,

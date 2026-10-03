@@ -1,6 +1,6 @@
 /**
  * Cloudflare KV 多账号与旗舰会话池管理器
- * 支持 Cloudflare KV 与内存级自动回退，确保未绑定 KV 时也能秒开运行
+ * 支持账号+密码自动登录、Token 手动录入双模式
  */
 import { ArenaClient } from './client.js';
 import { SCOUT_PROBES } from '../scout/probes.js';
@@ -9,35 +9,9 @@ import { evaluateDiagnostic } from '../scout/verifier.js';
 const KV_ACCOUNTS_KEY = 'arena:accounts';
 const KV_SESSIONS_PREFIX = 'arena:sessions:';
 
-// 内存级持久化回退 (防止未在 Cloudflare 后台配置 KV 时报错)
 const IN_MEMORY_STORE = {
-  accounts: [
-    {
-      id: 'acc_demo_main',
-      name: 'Arena-主力号 (Google)',
-      email: 'main.developer@gmail.com',
-      token: 'demo_session_token_placeholder',
-      baseUrl: 'https://arena.ai',
-      status: 'active',
-      flagshipSessionsCount: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      currentModel: 'Claude 3.7 / 3.5 Sonnet (高阶旗舰)'
-    }
-  ],
-  sessions: {
-    'acc_demo_main': [
-      {
-        chatId: 'chat_demo_s_tier',
-        accountId: 'acc_demo_main',
-        tier: 'S',
-        score: 100,
-        predictedModel: 'Claude 3.7 / 3.5 Sonnet (高阶旗舰)',
-        predictedFamily: 'Claude',
-        testedAt: new Date().toISOString()
-      }
-    ]
-  }
+  accounts: [],
+  sessions: {}
 };
 
 export class AccountPool {
@@ -55,7 +29,7 @@ export class AccountPool {
 
     try {
       const data = await this.env.ARENA_KV.get(KV_ACCOUNTS_KEY, { type: 'json' });
-      return data && data.length > 0 ? data : IN_MEMORY_STORE.accounts;
+      return data || IN_MEMORY_STORE.accounts;
     } catch (e) {
       console.warn("读取 KV 失败，回退到内存存储:", e);
       return IN_MEMORY_STORE.accounts;
@@ -77,22 +51,41 @@ export class AccountPool {
   }
 
   /**
-   * 添加新账号
+   * 添加新账号 (支持 账号密码登录 与 Token 录入)
    */
   async addAccount(accountData) {
     const accounts = await this.getAccounts();
+    const baseUrl = accountData.baseUrl || 'https://arena.ai';
+
+    let token = accountData.token || '';
+    let cookie = accountData.cookie || '';
+    let authMethod = 'manual_token';
+
+    // 如果提供了邮箱和密码，自动发起 Arena 登录认证获取 Token
+    if (accountData.email && accountData.password) {
+      const loginRes = await ArenaClient.loginWithCredentials(accountData.email, accountData.password, baseUrl);
+      if (loginRes.success) {
+        token = loginRes.token;
+        cookie = loginRes.cookie || cookie;
+        authMethod = 'password_auto';
+      }
+    }
+
     const newAccount = {
       id: 'acc_' + Date.now(),
-      name: accountData.name || '未命名账号',
+      name: accountData.name || accountData.email || '未命名账号',
       email: accountData.email || '',
-      token: accountData.token || '',
-      cookie: accountData.cookie || '',
-      baseUrl: accountData.baseUrl || 'https://arena.ai',
+      password: accountData.savePassword ? accountData.password : '', // 可选保存密码以便过期后自动重登
+      token,
+      cookie,
+      baseUrl,
+      authMethod,
       status: 'active',
       flagshipSessionsCount: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
+
     accounts.push(newAccount);
     await this.saveAccounts(accounts);
     return newAccount;
