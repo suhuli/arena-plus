@@ -1,6 +1,6 @@
 /**
  * 本地确定性评分引擎与最新模型归因器
- * 针对 2026 最新 Claude 3.7 / Opus 4.8 / Sonnet 5 与 GPT-5 / o3 进行高精度旗舰判别
+ * 融合 ccfingerprint 确定性断言逻辑与 LLM-Fingerprinter 行为风格匹配
  */
 import { SCOUT_PROBES } from './probes.js';
 
@@ -9,10 +9,11 @@ export function evaluateDiagnostic(probeAnswers) {
   let maxTotalScore = 0;
 
   const categoryScores = {
-    instruction_discipline: 0,
-    spatial_attention: 0,
-    deep_reasoning: 0,
-    frontier_knowledge: 0
+    math_reasoning: 0,
+    strict_discipline: 0,
+    logic_reasoning: 0,
+    negative_constraint: 0,
+    knowledge_cutoff: 0
   };
 
   const details = [];
@@ -23,7 +24,9 @@ export function evaluateDiagnostic(probeAnswers) {
 
     totalScore += verifyResult.score;
     maxTotalScore += verifyResult.maxScore;
-    categoryScores[probe.category] = verifyResult.score;
+    if (categoryScores[probe.category] !== undefined) {
+      categoryScores[probe.category] += verifyResult.score;
+    }
 
     details.push({
       probe: {
@@ -40,7 +43,7 @@ export function evaluateDiagnostic(probeAnswers) {
 
   const scorePercentage = maxTotalScore > 0 ? Math.round((totalScore / maxTotalScore) * 100) : 0;
 
-  // 严格的旗舰评级判定 (S / A / B / C)
+  // S/A/B/C 评级判定 (S 级旗舰保底)
   let tier = 'C';
   let tierLabel = '降级/轻量模型 (触发自动重抽)';
   let isFlagship = false;
@@ -63,17 +66,17 @@ export function evaluateDiagnostic(probeAnswers) {
     isFlagship = false;
   }
 
-  // 高精度最新模型归因 (结合 LLM-Fingerprinter 行为特征与注意力偏好)
+  // 模型归因分析 (Claude vs OpenAI vs 开源)
   let predictedModel = '未知模型 (混合/新架构)';
   let predictedFamily = 'Unknown';
 
   if (scorePercentage >= 90) {
-    // Claude 家族特征：对负向约束(like/similar禁词)与原生分词器字符注意力达到 100% 完美遵循
-    if (categoryScores.instruction_discipline === 25 && categoryScores.spatial_attention === 25) {
+    // Claude 3.7 / 3.5 Sonnet 特征：在负向禁词与严格格式提取上保持 100% 纪律
+    if (categoryScores.negative_constraint === 15 && categoryScores.strict_discipline === 30) {
       predictedModel = 'Claude 3.7 / 3.5 Sonnet / Opus 4.8 (Anthropic 顶阶旗舰)';
       predictedFamily = 'Claude';
     } else {
-      predictedModel = 'GPT-5 / o3 / GPT-5.5 (OpenAI 顶阶旗舰)';
+      predictedModel = 'GPT-5 / o3 / o4-mini (OpenAI 顶阶旗舰)';
       predictedFamily = 'GPT';
     }
   } else if (scorePercentage >= 75) {

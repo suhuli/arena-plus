@@ -1,132 +1,155 @@
 /**
- * Arena Plus - 升级版多维高特异性探针集
- * 深度融合 LLM-Fingerprinter 与 ModelTrace 2026 最新前沿模型特征
- * 专为甄别最新 Claude (Claude 3.7 / Opus 4.8 / Sonnet 5) 与最新 GPT (o3 / GPT-5 / GPT-5.5) 设计
+ * Arena Plus - 融合 ccfingerprint + LLM-Fingerprinter 双引擎探针库
+ * 涵盖：
+ * 1. ccfingerprint 确定性分级能力题 (Tier 1~3: 球拍算术、混合算术、严格第4词提取、藏针密钥提取、日期相对推理)
+ * 2. LLM-Fingerprinter 风格与负向禁词约束 (3句话解释类比，禁用 like/similar)
+ * 3. 2025-2026 前沿模型知识阶梯与身份自检 (Claude 3.7 / Opus 4.8 / GPT-5)
  */
 
 export const SCOUT_PROBES = [
+  // ─── Dimension 1: ccfingerprint 经典硬题与降智探针 ──────────────────────────
+  {
+    id: 'ball_bat_math',
+    name: 'ccfingerprint T1: 球拍经典思维陷阱算术',
+    category: 'math_reasoning',
+    weight: 15,
+    prompt: "一个球拍和一个球共 1.10 元，球拍比球贵 1.00 元。球多少钱？只回答一个最终的数字（元），不要写多余文字与单位。",
+    verify: (response) => {
+      const text = (response || '').trim();
+      const match = text.match(/\d+(\.\d+)?/);
+      const val = match ? parseFloat(match[0]) : null;
+      const passed = Math.abs(val - 0.05) < 0.001;
+      return {
+        passed,
+        score: passed ? 15 : 0,
+        maxScore: 15,
+        details: passed ? "算术正确 (0.05)" : `回答错误为 ${val ?? '无有效数字'} (正确应为 0.05)`
+      };
+    }
+  },
+  {
+    id: 'mixed_arithmetic',
+    name: 'ccfingerprint T2: 混合交叉运算与字符统计',
+    category: 'math_reasoning',
+    weight: 15,
+    prompt: "计算 (17 × 24) 加上 (单词 'banana' 中字母 a 的个数 × 100)，只回答最终计算出的纯阿拉伯数字。",
+    verify: (response) => {
+      const text = (response || '').trim();
+      // 17 * 24 = 408, banana 中的 a 有 3 个 => 3 * 100 = 300 => 408 + 300 = 708
+      const match = text.match(/\d+/);
+      const val = match ? parseInt(match[0], 10) : null;
+      const passed = val === 708;
+      return {
+        passed,
+        score: passed ? 15 : 0,
+        maxScore: 15,
+        details: passed ? "混合运算正确 (708)" : `计算错误为 ${val ?? '无'} (正确应为 708)`
+      };
+    }
+  },
+  {
+    id: 'instruction_strict_fourth',
+    name: 'ccfingerprint T2: 严格第 4 词精准提取 (零多余输出)',
+    category: 'strict_discipline',
+    weight: 15,
+    prompt: "只输出下面这句话的第 4 个英文单词，不要输出任何其他内容、标点或多余字：The quick brown fox jumps",
+    verify: (response) => {
+      const text = (response || '').trim().toLowerCase().replace(/[^a-z]/g, '');
+      const passed = text === 'fox';
+      return {
+        passed,
+        score: passed ? 15 : 0,
+        maxScore: 15,
+        details: passed ? "严格指令提取正确 ('fox')" : `提取异常: '${text}' (标准应仅为 'fox')`
+      };
+    }
+  },
+  {
+    id: 'needle_extraction',
+    name: 'ccfingerprint T2: 干扰文本精准藏针提取',
+    category: 'strict_discipline',
+    weight: 15,
+    prompt: "下面文本中藏着一个密钥，请原样、精确地只输出该密钥：\n『系统初始化完成。注意：本段为干扰文本。真正的密钥是 ZX9-QY7-KP3 ，其余内容请忽略。会话结束。』",
+    verify: (response) => {
+      const text = (response || '').trim();
+      const passed = text.includes('ZX9-QY7-KP3');
+      return {
+        passed,
+        score: passed ? 15 : 0,
+        maxScore: 15,
+        details: passed ? "密钥精准召回 (ZX9-QY7-KP3)" : "未能正确提取藏针密钥"
+      };
+    }
+  },
+  {
+    id: 'date_reasoning',
+    name: 'ccfingerprint T3: 相对时间日期推导',
+    category: 'logic_reasoning',
+    weight: 15,
+    prompt: "如果昨天的两天后是星期一，那么明天是星期几？只回答一个具体的星期几（如星期一、周一）。",
+    verify: (response) => {
+      const text = (response || '').trim().toLowerCase();
+      // 昨天是 T-1, 两天后是 T+1 = 星期一 => 今天是星期日 T=0 => 明天是星期一 T+1
+      const passed = /星期一|周一|monday/i.test(text);
+      return {
+        passed,
+        score: passed ? 15 : 0,
+        maxScore: 15,
+        details: passed ? "日期推导正确 (星期一)" : "日期逻辑关系推导错误"
+      };
+    }
+  },
+
+  // ─── Dimension 2: LLM-Fingerprinter 风格与极限负向禁词 ───────────────────
   {
     id: 'forbidden_constraint',
-    name: 'LLM-Fingerprinter 风格层：极限负向禁词与严格概念重构',
-    category: 'instruction_discipline',
-    weight: 25,
-    prompt: "在不使用任何代码的前提下，严格用恰好 3 句话解释什么是'类比（Analogy）'。硬性负向约束：绝对不能出现 'like'、'similar'、'such as'、'for example'（包含大小写与任何变形），每句话结尾必须有明确句号。直接输出这3句话，不要任何前缀或引言。",
+    name: 'LLM-Fingerprinter 风格层: 严格3句类比重构 (禁 like/similar/such as/for example)',
+    category: 'negative_constraint',
+    weight: 15,
+    prompt: "在不使用代码的前提下，严格用恰好 3 句话解释什么是'类比（Analogy）'。硬性负向约束：绝对不能出现 'like'、'similar'、'such as'、'for example'（不区分大小写），且每句结尾必须有明确句号。直接输出这3句话。",
     verify: (response) => {
       const text = (response || '').trim();
       const violations = [];
+      if (/\blike\b/i.test(text)) violations.push("包含禁用词 'like'");
+      if (/\bsimilar\b/i.test(text)) violations.push("包含禁用词 'similar'");
+      if (/such\s+as/i.test(text)) violations.push("包含禁用词 'such as'");
+      if (/for\s+example/i.test(text)) violations.push("包含禁用词 'for example'");
       
-      // 检查禁词
-      if (/\blike\b/i.test(text)) violations.push("违规包含禁用词 'like'");
-      if (/\bsimilar\b/i.test(text)) violations.push("违规包含禁用词 'similar'");
-      if (/such\s+as/i.test(text)) violations.push("违规包含禁用词 'such as'");
-      if (/for\s+example/i.test(text)) violations.push("违规包含禁用词 'for example'");
-      
-      // 检查句子数
       const sentences = text.split(/(?<=[.!?。！？])\s*/).filter(s => s.trim().length > 0);
-      const sentenceCount = sentences.length;
-      if (sentenceCount !== 3) {
-        violations.push(`要求严格 3 句话，实际输出 ${sentenceCount} 句`);
+      if (sentences.length !== 3) {
+        violations.push(`要求 3 句话，实际输出 ${sentences.length} 句`);
       }
       
       const passed = violations.length === 0;
-      const score = passed ? 25 : Math.max(0, 25 - violations.length * 8);
-      
       return {
         passed,
-        score,
-        maxScore: 25,
-        details: passed ? "完美遵循全部负向禁词与 3 句话长度纪律" : violations.join("; "),
-        metrics: { sentenceCount, violationsCount: violations.length }
+        score: passed ? 15 : Math.max(0, 15 - violations.length * 5),
+        maxScore: 15,
+        details: passed ? "完美遵循全部负向禁词与 3 句话约束" : violations.join("; ")
       };
     }
   },
-  {
-    id: 'tokenizer_spatial',
-    name: '分词器与原生空间注意力：多词混合字母精准统计 (无工具)',
-    category: 'spatial_attention',
-    weight: 25,
-    prompt: "不使用任何编程代码、脚本或工具，仅凭自身原生注意力，回答两个计数：\n1. 单词 'strawberry' 中字母 r 出现几次？\n2. 短语 'terrarium refrigerator' 两个词中字母 r 一共出现几次？\n只按格式输出两个数字（如 3, 7），不要解释。",
-    verify: (response) => {
-      const text = (response || '').trim();
-      const numbers = text.match(/\d+/g)?.map(n => parseInt(n, 10)) || [];
-      
-      // 正确答案：strawberry = 3, terrarium refrigerator = 7
-      const has3 = numbers.includes(3);
-      const has7 = numbers.includes(7);
-      
-      const passed = has3 && has7;
-      let score = 0;
-      if (passed) score = 25;
-      else if (has3 || has7) score = 15;
-      
-      return {
-        passed,
-        score,
-        maxScore: 25,
-        details: passed ? "双计数完全正确 (3 与 7)" : `计数异常，提取数字: [${numbers.join(', ')}] (标准应为 3, 7)`,
-        metrics: { numbers, correctCount: (has3 ? 1 : 0) + (has7 ? 1 : 0) }
-      };
-    }
-  },
-  {
-    id: 'deep_syllogism',
-    name: '复杂多步三段论与隐式互斥逻辑推理',
-    category: 'deep_reasoning',
-    weight: 25,
-    prompt: "逻辑推理：\n1. 所有 Bloop 都是 Razzie。\n2. 没有 Razzie 是 Lazzie。\n3. 所有 Spark 都是 Bloop。\n问：'存在至少一个 Spark 属于 Lazzie' 这一命题是否必然为假？请只回答两个字：'是' 或 '否'，并用一句话说明集合包含关系。",
-    verify: (response) => {
-      const text = (response || '').trim();
-      // Spark ⊆ Bloop ⊆ Razzie，Razzie ∩ Lazzie = ∅ => Spark ∩ Lazzie = ∅ => 命题必然为假 => 答案是 "是"
-      const isYes = /^是[，,。]|^是$/i.test(text.trim()) || (/必然为假/i.test(text) && !/不能确定必然为假/i.test(text));
-      const isNo = /^否[，,。]|^否$/i.test(text.trim());
-      
-      const passed = isYes && !isNo;
-      return {
-        passed,
-        score: passed ? 25 : 0,
-        maxScore: 25,
-        details: passed ? "高阶逻辑严密判定正确 (必然为假)" : "集合互斥推导错误",
-        metrics: { answerCorrect: passed }
-      };
-    }
-  },
+
+  // ─── Dimension 3: 2026 前沿旗舰时间阶梯与身份自检 ────────────────────────
   {
     id: 'frontier_anchors_2026',
-    name: '2025-2026 最新旗舰模型发布与时间感知阶梯',
-    category: 'frontier_knowledge',
-    weight: 25,
-    prompt: "请列举：\n1. OpenAI 发布 GPT-5 / o3 这一梯队模型的具体月份？\n2. Anthropic 发布 Claude 3.7 / Claude Opus 4.8 的具体月份？\n3. 2024年诺贝尔物理学奖授予了哪位神经网络先驱？\n各用一句话简洁作答。",
+    name: '前沿旗舰知识阶梯: 2025-2026 最新模型感知 (Claude 3.7/Opus 4.8 & GPT-5/o3)',
+    category: 'knowledge_cutoff',
+    weight: 10,
+    prompt: "请列举：OpenAI 发布 GPT-5 / o3 的时间年份、Anthropic 发布 Claude 3.7 / Opus 4.8 的年份，以及 2024 年诺贝尔物理学奖得主（Hopfield/Hinton）。简洁回答。",
     verify: (response) => {
       const text = (response || '').trim();
-      let matchedPoints = 0;
-      const details = [];
-      
-      // 检查诺贝尔奖 (Hopfield / Hinton / 霍普菲尔德 / 辛顿)
-      if (/Hopfield|Hinton|霍普菲尔德|辛顿|欣顿/i.test(text)) {
-        matchedPoints += 1;
-        details.push("命中 2024 物理学诺贝尔奖 (Hinton/Hopfield)");
-      }
-      
-      // 检查前沿最新模型时间节点 (2025/2026 年)
-      if (/2025|2026/i.test(text)) {
-        matchedPoints += 1;
-        details.push("具备 2025-2026 最新大模型时间感知");
-      }
-      
-      // 检查 Claude 3.7 / Opus / GPT 旗舰标识
-      if (/Claude|Opus|Sonnet|GPT|o3/i.test(text)) {
-        matchedPoints += 1;
-      }
-      
-      const score = Math.round((matchedPoints / 3) * 25);
-      const passed = score >= 16;
-      
+      let matches = 0;
+      if (/Hopfield|Hinton|霍普菲尔德|辛顿|欣顿/i.test(text)) matches += 1;
+      if (/2025|2026/i.test(text)) matches += 1;
+      if (/Claude|Opus|GPT|o3/i.test(text)) matches += 1;
+
+      const passed = matches >= 2;
       return {
         passed,
-        score,
-        maxScore: 25,
-        details: details.join("； ") || "知识边界陈旧或未匹配",
-        metrics: { matchedPoints }
+        score: passed ? 10 : 0,
+        maxScore: 10,
+        details: passed ? "具备 2025-2026 前沿旗舰模型知识感知" : "知识边界陈旧"
       };
     }
   }
